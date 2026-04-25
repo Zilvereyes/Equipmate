@@ -1,4 +1,4 @@
-## Interface: 11500
+## Interface: 11508
 ## Author: TheBoringDad
 ## Version: 0.51
 ## Title: Equipmate
