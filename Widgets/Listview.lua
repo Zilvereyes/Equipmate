@@ -6,7 +6,10 @@ function TBDListviewMixin:OnLoad()
 
     self.DataProvider = CreateDataProvider();
     self.scrollView = CreateScrollBoxListLinearView();
-    self.scrollView:SetDataProvider(self.DataProvider);
+    self.scrollView:SetElementFactory(function(factory, elementData)
+		factory(elementData.template, elementData.initializer);
+	end);
+	self.scrollView:SetDataProvider(self.DataProvider);
 
     ---height is defined in the xml keyValues
     local height = self.elementHeight;
