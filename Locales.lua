@@ -41,7 +41,7 @@ locales.enUS = {
     FLYOUT_PUT_IN_BAG = "Put item in bag",
 
     ITEM_TOOLTIP_EQUIPMENT_SET_ITEM_HEADER_LINE = "Part of the following outfits",
-    ITEM_TOOLTIP_IGNORE_BINDING_POPUP = "Hold Ctrl to override binding popup warning.",
+    ITEM_TOOLTIP_BINDING_CONFIRMATION = "Binding an item requires confirmation.",
 }
 
 

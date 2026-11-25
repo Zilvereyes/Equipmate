@@ -236,7 +236,7 @@ function EquipmentFlyoutButtonMixin:SetItem(item)
             GameTooltip:SetOwner(self, "ANCHOR_LEFT")
             GameTooltip:SetHyperlink(item.link)
             GameTooltip:AddLine(" ")
-            GameTooltip_AddColoredLine(GameTooltip, EQUIPMATE_ITEM_TOOLTIP_IGNORE_BINDING_POPUP, BLUE_FONT_COLOR);
+            GameTooltip_AddColoredLine(GameTooltip, EQUIPMATE_ITEM_TOOLTIP_BINDING_CONFIRMATION, BLUE_FONT_COLOR);
             GameTooltip:Show()
         end)
         self:Show()
@@ -245,12 +245,6 @@ function EquipmentFlyoutButtonMixin:SetItem(item)
         self:SetScript("OnClick", function()
             C_Container.PickupContainerItem(item.bag, item.slot)
             PickupInventoryItem(item.invSlotID)
-
-            if IsControlKeyDown() then
-                if StaticPopup1Button1 then
-                    StaticPopup1Button1:Click()
-                end
-            end
 
             if CursorHasItem() then
                 C_Container.PickupContainerItem(item.bag, item.slot)
