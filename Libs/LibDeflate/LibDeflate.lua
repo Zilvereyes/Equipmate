@@ -3,6 +3,9 @@ LibDeflate 1.0.2-release <br>
 Pure Lua compressor and decompressor with high compression ratio using
 DEFLATE/zlib format.
 
+Equipmate modification: optional decompressed-output limits are enforced
+inside the inflater for callers handling untrusted input.
+
 @file LibDeflate.lua
 @author Haoqian He (Github: SafeteeWoW; World of Warcraft: Safetyy-Illidan(US))
 @copyright LibDeflate <2018-2020> Haoqian He
@@ -102,7 +105,8 @@ do
 	-- 1 : v1.0.0
 	-- 2 : v1.0.1
 	-- 3 : v1.0.2
-	local _MINOR = 3
+	-- 4 : Equipmate security patch adding decompressed-output limits
+	local _MINOR = 4
 
 	local _COPYRIGHT =
 	"LibDeflate ".._VERSION
@@ -649,6 +653,20 @@ local function IsValidArguments(str,
 				end
 			end
 		end
+	end
+	return true, ""
+end
+
+-- Check an optional decompressed-output limit.
+-- @param max_output_size nil, or a non-negative integer number of bytes.
+-- @return true if valid, false if not valid.
+-- @return if not valid, the error message.
+local function IsValidMaxOutputSize(max_output_size)
+	if max_output_size ~= nil and (type(max_output_size) ~= "number"
+		or max_output_size < 0 or max_output_size % 1 ~= 0) then
+		return false,
+			("'max_output_size' - nil or non-negative integer expected got '%s'.")
+				:format(tostring(max_output_size))
 	end
 	return true, ""
 end
@@ -2250,8 +2268,9 @@ end
 -- @param str the whole string to be decompressed.
 -- @param dictionary The preset dictionary. nil if not provided.
 --		This dictionary should be produced by LibDeflate:CreateDictionary(str)
+-- @param max_output_size nil, or the maximum decompressed size in bytes.
 -- @return The decomrpess state.
-local function CreateDecompressState(str, dictionary)
+local function CreateDecompressState(str, dictionary, max_output_size)
 	local ReadBits, ReadBytes, Decode, ReaderBitlenLeft
 		, SkipToByteBoundary = CreateReader(str)
 	local state =
@@ -2265,6 +2284,8 @@ local function CreateDecompressState(str, dictionary)
 		buffer = {},
 		result_buffer = {},
 		dictionary = dictionary,
+		output_size = 0,
+		max_output_size = max_output_size,
 	}
 	return state
 end
@@ -2338,6 +2359,8 @@ local function DecodeUntilEndOfBlock(state, lcodes_huffman_bitlens
 		state.buffer, state.buffer_size, state.ReadBits, state.Decode
 		, state.ReaderBitlenLeft, state.result_buffer
 	local dictionary = state.dictionary
+	local output_size = state.output_size
+	local max_output_size = state.max_output_size
 	local dict_string_table
 	local dict_strlen
 
@@ -2361,8 +2384,12 @@ local function DecodeUntilEndOfBlock(state, lcodes_huffman_bitlens
 		-- invalid literal/length or distance code in fixed or dynamic block
 			return -10
 		elseif symbol < 256 then -- Literal
+			if max_output_size and output_size + 1 > max_output_size then
+				return -18 -- decompressed output exceeds configured limit
+			end
 			buffer_size = buffer_size + 1
 			buffer[buffer_size] = _byte_to_char[symbol]
+			output_size = output_size + 1
 		elseif symbol > 256 then -- Length code
 			symbol = symbol - 256
 			local bitlen = _literal_deflate_code_to_base_len[symbol]
@@ -2385,6 +2412,9 @@ local function DecodeUntilEndOfBlock(state, lcodes_huffman_bitlens
 			-- distance is too far back in fixed or dynamic block
 				return -11
 			end
+			if max_output_size and output_size + bitlen > max_output_size then
+				return -18 -- decompressed output exceeds configured limit
+			end
 			if char_buffer_index >= -257 then
 				for _=1, bitlen do
 					buffer_size = buffer_size + 1
@@ -2400,6 +2430,7 @@ local function DecodeUntilEndOfBlock(state, lcodes_huffman_bitlens
 					char_buffer_index = char_buffer_index + 1
 				end
 			end
+			output_size = output_size + bitlen
 		end
 
 		if ReaderBitlenLeft() < 0 then
@@ -2420,6 +2451,7 @@ local function DecodeUntilEndOfBlock(state, lcodes_huffman_bitlens
 	until symbol == 256
 
 	state.buffer_size = buffer_size
+	state.output_size = output_size
 
 	return 0
 end
@@ -2429,9 +2461,10 @@ end
 -- @return 0 if succeeds, other value if fails.
 local function DecompressStoreBlock(state)
 	local buffer, buffer_size, ReadBits, ReadBytes, ReaderBitlenLeft
-		, SkipToByteBoundary, result_buffer =
+		, SkipToByteBoundary, result_buffer, output_size, max_output_size =
 		state.buffer, state.buffer_size, state.ReadBits, state.ReadBytes
 		, state.ReaderBitlenLeft, state.SkipToByteBoundary, state.result_buffer
+		, state.output_size, state.max_output_size
 
 	SkipToByteBoundary()
 	local bytelen = ReadBits(16)
@@ -2450,12 +2483,16 @@ local function DecompressStoreBlock(state)
 		+ (bytelenComp-bytelenComp % 256)/256 ~= 255 then
 		return -2 -- Not one's complement
 	end
+	if max_output_size and output_size + bytelen > max_output_size then
+		return -18 -- decompressed output exceeds configured limit
+	end
 
 	-- Note that ReadBytes will skip to the next byte boundary first.
 	buffer_size = ReadBytes(bytelen, buffer, buffer_size)
 	if buffer_size < 0 then
 		return 2 -- available inflate data did not terminate
 	end
+	output_size = output_size + bytelen
 
 	-- memory clean up when there are enough bytes in the buffer.
 	if buffer_size >= 65536 then
@@ -2467,6 +2504,7 @@ local function DecompressStoreBlock(state)
 		buffer[buffer_size+1] = nil
 	end
 	state.buffer_size = buffer_size
+	state.output_size = output_size
 	return 0
 end
 
@@ -2632,8 +2670,8 @@ end
 
 -- @see LibDeflate:DecompressDeflate(str)
 -- @see LibDeflate:DecompressDeflateWithDict(str, dictionary)
-local function DecompressDeflateInternal(str, dictionary)
-	local state = CreateDecompressState(str, dictionary)
+local function DecompressDeflateInternal(str, dictionary, max_output_size)
+	local state = CreateDecompressState(str, dictionary, max_output_size)
 	local result, status = Inflate(state)
 	if not result then
 		return nil, status
@@ -2646,8 +2684,8 @@ end
 
 -- @see LibDeflate:DecompressZlib(str)
 -- @see LibDeflate:DecompressZlibWithDict(str)
-local function DecompressZlibInternal(str, dictionary)
-	local state = CreateDecompressState(str, dictionary)
+local function DecompressZlibInternal(str, dictionary, max_output_size)
+	local state = CreateDecompressState(str, dictionary, max_output_size)
 	local ReadBits = state.ReadBits
 
 	local CMF = ReadBits(8)
@@ -2718,6 +2756,10 @@ end
 
 --- Decompress a raw deflate compressed data.
 -- @param str [string] The data to be decompressed.
+-- @param max_output_size [integer/nil] The maximum decompressed size in bytes.
+-- Pass a non-negative integer when handling untrusted input. If omitted, the
+-- decompressed size is not limited for backward compatibility. Data exceeding
+-- the limit fails before bytes beyond the limit are emitted.
 -- @return [string/nil] If the decompression succeeds, return the decompressed
 -- data. If the decompression fails, return nil. You should check if this return
 -- value is non-nil to know if the decompression succeeds.
@@ -2729,13 +2771,18 @@ end
 -- If the decompression fails (The first return value of this function is nil),
 -- this return value is undefined.
 -- @see LibDeflate:CompressDeflate
-function LibDeflate:DecompressDeflate(str)
+function LibDeflate:DecompressDeflate(str, max_output_size)
 	local arg_valid, arg_err = IsValidArguments(str)
+	local limit_valid, limit_err = IsValidMaxOutputSize(max_output_size)
 	if not arg_valid then
-		error(("Usage: LibDeflate:DecompressDeflate(str): "
+		error(("Usage: LibDeflate:DecompressDeflate(str, max_output_size): "
 			..arg_err), 2)
 	end
-	return DecompressDeflateInternal(str)
+	if not limit_valid then
+		error(("Usage: LibDeflate:DecompressDeflate(str, max_output_size): "
+			..limit_err), 2)
+	end
+	return DecompressDeflateInternal(str, nil, max_output_size)
 end
 
 --- Decompress a raw deflate compressed data with a preset dictionary.
@@ -2745,6 +2792,10 @@ end
 -- Decompression and compression must use the same dictionary.
 -- Otherwise wrong decompressed data could be produced without generating any
 -- error.
+-- @param max_output_size [integer/nil] The maximum decompressed size in bytes.
+-- Pass a non-negative integer when handling untrusted input. If omitted, the
+-- decompressed size is not limited for backward compatibility. Data exceeding
+-- the limit fails before bytes beyond the limit are emitted.
 -- @return [string/nil] If the decompression succeeds, return the decompressed
 -- data. If the decompression fails, return nil. You should check if this return
 -- value is non-nil to know if the decompression succeeds.
@@ -2756,17 +2807,27 @@ end
 -- If the decompression fails (The first return value of this function is nil),
 -- this return value is undefined.
 -- @see LibDeflate:CompressDeflateWithDict
-function LibDeflate:DecompressDeflateWithDict(str, dictionary)
+function LibDeflate:DecompressDeflateWithDict(str, dictionary, max_output_size)
 	local arg_valid, arg_err = IsValidArguments(str, true, dictionary)
+	local limit_valid, limit_err = IsValidMaxOutputSize(max_output_size)
 	if not arg_valid then
-		error(("Usage: LibDeflate:DecompressDeflateWithDict(str, dictionary): "
+		error(("Usage: LibDeflate:DecompressDeflateWithDict(str, dictionary, "
+			.."max_output_size): "
 			..arg_err), 2)
 	end
-	return DecompressDeflateInternal(str, dictionary)
+	if not limit_valid then
+		error(("Usage: LibDeflate:DecompressDeflateWithDict(str, dictionary, "
+			.."max_output_size): "..limit_err), 2)
+	end
+	return DecompressDeflateInternal(str, dictionary, max_output_size)
 end
 
 --- Decompress a zlib compressed data.
 -- @param str [string] The data to be decompressed
+-- @param max_output_size [integer/nil] The maximum decompressed size in bytes.
+-- Pass a non-negative integer when handling untrusted input. If omitted, the
+-- decompressed size is not limited for backward compatibility. Data exceeding
+-- the limit fails before bytes beyond the limit are emitted.
 -- @return [string/nil] If the decompression succeeds, return the decompressed
 -- data. If the decompression fails, return nil. You should check if this return
 -- value is non-nil to know if the decompression succeeds.
@@ -2778,13 +2839,18 @@ end
 -- If the decompression fails (The first return value of this function is nil),
 -- this return value is undefined.
 -- @see LibDeflate:CompressZlib
-function LibDeflate:DecompressZlib(str)
+function LibDeflate:DecompressZlib(str, max_output_size)
 	local arg_valid, arg_err = IsValidArguments(str)
+	local limit_valid, limit_err = IsValidMaxOutputSize(max_output_size)
 	if not arg_valid then
-		error(("Usage: LibDeflate:DecompressZlib(str): "
+		error(("Usage: LibDeflate:DecompressZlib(str, max_output_size): "
 			..arg_err), 2)
 	end
-	return DecompressZlibInternal(str)
+	if not limit_valid then
+		error(("Usage: LibDeflate:DecompressZlib(str, max_output_size): "
+			..limit_err), 2)
+	end
+	return DecompressZlibInternal(str, nil, max_output_size)
 end
 
 --- Decompress a zlib compressed data with a preset dictionary.
@@ -2794,6 +2860,10 @@ end
 -- Decompression and compression must use the same dictionary.
 -- Otherwise wrong decompressed data could be produced without generating any
 -- error.
+-- @param max_output_size [integer/nil] The maximum decompressed size in bytes.
+-- Pass a non-negative integer when handling untrusted input. If omitted, the
+-- decompressed size is not limited for backward compatibility. Data exceeding
+-- the limit fails before bytes beyond the limit are emitted.
 -- @return [string/nil] If the decompression succeeds, return the decompressed
 -- data. If the decompression fails, return nil. You should check if this return
 -- value is non-nil to know if the decompression succeeds.
@@ -2805,13 +2875,19 @@ end
 -- If the decompression fails (The first return value of this function is nil),
 -- this return value is undefined.
 -- @see LibDeflate:CompressZlibWithDict
-function LibDeflate:DecompressZlibWithDict(str, dictionary)
+function LibDeflate:DecompressZlibWithDict(str, dictionary, max_output_size)
 	local arg_valid, arg_err = IsValidArguments(str, true, dictionary)
+	local limit_valid, limit_err = IsValidMaxOutputSize(max_output_size)
 	if not arg_valid then
-		error(("Usage: LibDeflate:DecompressZlibWithDict(str, dictionary): "
+		error(("Usage: LibDeflate:DecompressZlibWithDict(str, dictionary, "
+			.."max_output_size): "
 			..arg_err), 2)
 	end
-	return DecompressZlibInternal(str, dictionary)
+	if not limit_valid then
+		error(("Usage: LibDeflate:DecompressZlibWithDict(str, dictionary, "
+			.."max_output_size): "..limit_err), 2)
+	end
+	return DecompressZlibInternal(str, dictionary, max_output_size)
 end
 
 -- Calculate the huffman code of fixed block

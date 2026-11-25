@@ -22,6 +22,7 @@ LibCompress, etc.) to determine which combination works best for you.
 MyAddon = LibStub("AceAddon-3.0"):NewAddon("MyAddon", "AceComm-3.0")
 local LibSerialize = LibStub("LibSerialize")
 local LibDeflate = LibStub("LibDeflate")
+local MAX_DECOMPRESSED_SIZE = 1024 * 1024
 
 function MyAddon:OnEnable()
     self:RegisterComm("MyPrefix")
@@ -36,9 +37,11 @@ function MyAddon:Transmit(data)
 end
 
 function MyAddon:OnCommReceived(prefix, payload, distribution, sender)
+    -- Implement IsAuthorizedSender using your addon's trust policy.
+    if not self:IsAuthorizedSender(sender) then return end
     local decoded = LibDeflate:DecodeForWoWAddonChannel(payload)
     if not decoded then return end
-    local decompressed = LibDeflate:DecompressDeflate(decoded)
+    local decompressed = LibDeflate:DecompressDeflate(decoded, MAX_DECOMPRESSED_SIZE)
     if not decompressed then return end
     local success, data = LibSerialize:Deserialize(decompressed)
     if not success then return end
