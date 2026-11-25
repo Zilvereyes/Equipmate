@@ -132,19 +132,19 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
 	<td class="summary">Decode the string produced by LibDeflate:EncodeForWoWChatChannel.</td>
 	</tr>
 	<tr>
-	<td class="name" ><a href="#LibDeflate:DecompressDeflate">LibDeflate:DecompressDeflate (str)</a></td>
+	<td class="name" ><a href="#LibDeflate:DecompressDeflate">LibDeflate:DecompressDeflate (str, max_output_size)</a></td>
 	<td class="summary">Decompress a raw deflate compressed data.</td>
 	</tr>
 	<tr>
-	<td class="name" ><a href="#LibDeflate:DecompressDeflateWithDict">LibDeflate:DecompressDeflateWithDict (str, dictionary)</a></td>
+	<td class="name" ><a href="#LibDeflate:DecompressDeflateWithDict">LibDeflate:DecompressDeflateWithDict (str, dictionary, max_output_size)</a></td>
 	<td class="summary">Decompress a raw deflate compressed data with a preset dictionary.</td>
 	</tr>
 	<tr>
-	<td class="name" ><a href="#LibDeflate:DecompressZlib">LibDeflate:DecompressZlib (str)</a></td>
+	<td class="name" ><a href="#LibDeflate:DecompressZlib">LibDeflate:DecompressZlib (str, max_output_size)</a></td>
 	<td class="summary">Decompress a zlib compressed data.</td>
 	</tr>
 	<tr>
-	<td class="name" ><a href="#LibDeflate:DecompressZlibWithDict">LibDeflate:DecompressZlibWithDict (str, dictionary)</a></td>
+	<td class="name" ><a href="#LibDeflate:DecompressZlibWithDict">LibDeflate:DecompressZlibWithDict (str, dictionary, max_output_size)</a></td>
 	<td class="summary">Decompress a zlib compressed data with a preset dictionary.</td>
 	</tr>
 	<tr>
@@ -607,7 +607,7 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
 </dd>
     <dt>
     <a name = "LibDeflate:DecompressDeflate"></a>
-    <strong>LibDeflate:DecompressDeflate (str)</strong>
+    <strong>LibDeflate:DecompressDeflate (str, max_output_size)</strong>
     </dt>
     <dd>
     Decompress a raw deflate compressed data.
@@ -617,6 +617,11 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
     <ul>
         <li><span class="parameter">str</span>
          [string] The data to be decompressed.
+        </li>
+        <li><span class="parameter">max_output_size</span>
+         [integer/nil] The maximum decompressed size in bytes. Pass a
+ non-negative integer for untrusted input; nil preserves unlimited legacy
+ behavior. Data exceeding the limit fails before extra bytes are emitted.
         </li>
     </ul>
 
@@ -646,7 +651,7 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
 </dd>
     <dt>
     <a name = "LibDeflate:DecompressDeflateWithDict"></a>
-    <strong>LibDeflate:DecompressDeflateWithDict (str, dictionary)</strong>
+    <strong>LibDeflate:DecompressDeflateWithDict (str, dictionary, max_output_size)</strong>
     </dt>
     <dd>
     Decompress a raw deflate compressed data with a preset dictionary.
@@ -663,6 +668,11 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
  Decompression and compression must use the same dictionary.
  Otherwise wrong decompressed data could be produced without generating any
  error.
+        </li>
+        <li><span class="parameter">max_output_size</span>
+         [integer/nil] The maximum decompressed size in bytes. Pass a
+ non-negative integer for untrusted input; nil preserves unlimited legacy
+ behavior. Data exceeding the limit fails before extra bytes are emitted.
         </li>
     </ul>
 
@@ -692,7 +702,7 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
 </dd>
     <dt>
     <a name = "LibDeflate:DecompressZlib"></a>
-    <strong>LibDeflate:DecompressZlib (str)</strong>
+    <strong>LibDeflate:DecompressZlib (str, max_output_size)</strong>
     </dt>
     <dd>
     Decompress a zlib compressed data.
@@ -702,6 +712,11 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
     <ul>
         <li><span class="parameter">str</span>
          [string] The data to be decompressed
+        </li>
+        <li><span class="parameter">max_output_size</span>
+         [integer/nil] The maximum decompressed size in bytes. Pass a
+ non-negative integer for untrusted input; nil preserves unlimited legacy
+ behavior. Data exceeding the limit fails before extra bytes are emitted.
         </li>
     </ul>
 
@@ -731,7 +746,7 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
 </dd>
     <dt>
     <a name = "LibDeflate:DecompressZlibWithDict"></a>
-    <strong>LibDeflate:DecompressZlibWithDict (str, dictionary)</strong>
+    <strong>LibDeflate:DecompressZlibWithDict (str, dictionary, max_output_size)</strong>
     </dt>
     <dd>
     Decompress a zlib compressed data with a preset dictionary.
@@ -748,6 +763,11 @@ https://github.com/safeteeWow/LibDeflate/issues</li>
  Decompression and compression must use the same dictionary.
  Otherwise wrong decompressed data could be produced without generating any
  error.
+        </li>
+        <li><span class="parameter">max_output_size</span>
+         [integer/nil] The maximum decompressed size in bytes. Pass a
+ non-negative integer for untrusted input; nil preserves unlimited legacy
+ behavior. Data exceeding the limit fails before extra bytes are emitted.
         </li>
     </ul>
 

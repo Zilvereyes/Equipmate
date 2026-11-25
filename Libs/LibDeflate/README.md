@@ -150,6 +150,7 @@ else
 end
 
 local example_input = "12123123412345123456123456712345678123456789"
+local MAX_NETWORK_OUTPUT_SIZE = 1024 * 1024
 
 --- Compress using raw deflate format
 local compress_deflate = LibDeflate:CompressDeflate(example_input)
@@ -172,10 +173,12 @@ end
 local data_to_trasmit_WoW_addon = LibDeflate:EncodeForWoWAddonChannel(
 	compress_deflate)
 -- When the receiver gets the data, decoded it first.
+-- Authenticate the sender against your addon's trust policy before decoding.
 local data_decoded_WoW_addon = LibDeflate:DecodeForWoWAddonChannel(
 	data_to_trasmit_WoW_addon)
--- Then decomrpess it
-local decompress_deflate = LibDeflate:DecompressDeflate(data_decoded_WoW_addon)
+-- Then decompress it with an explicit output ceiling.
+local decompress_deflate = LibDeflate:DecompressDeflate(
+	data_decoded_WoW_addon, MAX_NETWORK_OUTPUT_SIZE)
 
 assert(decompress_deflate == example_input)
 

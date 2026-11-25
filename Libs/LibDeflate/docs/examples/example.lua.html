@@ -85,6 +85,7 @@ along with this program.  If not, see https://www.gnu.org/licenses/.
 <span class="keyword">end</span>
 
 <span class="keyword">local</span> example_input = <span class="string">"12123123412345123456123456712345678123456789"</span>
+<span class="keyword">local</span> MAX_NETWORK_OUTPUT_SIZE = <span class="number">1024</span> * <span class="number">1024</span>
 
 <span class="comment">-- Compress using raw deflate format
 </span><span class="keyword">local</span> compress_deflate = LibDeflate:CompressDeflate(example_input)
@@ -106,10 +107,12 @@ along with this program.  If not, see https://www.gnu.org/licenses/.
 </span><span class="keyword">local</span> data_to_trasmit_WoW_addon = LibDeflate:EncodeForWoWAddonChannel(
 	compress_deflate)
 <span class="comment">-- When the receiver gets the data, decoded it first.
+</span><span class="comment">-- Authenticate the sender against your addon's trust policy before decoding.
 </span><span class="keyword">local</span> data_decoded_WoW_addon = LibDeflate:DecodeForWoWAddonChannel(
 	data_to_trasmit_WoW_addon)
-<span class="comment">-- Then decomrpess it
-</span><span class="global">assert</span>(LibDeflate:DecompressDeflate(data_decoded_WoW_addon) == example_input)
+<span class="comment">-- Then decompress it with an explicit output ceiling.
+</span><span class="global">assert</span>(LibDeflate:DecompressDeflate(data_decoded_WoW_addon,
+	MAX_NETWORK_OUTPUT_SIZE) == example_input)
 
 <span class="comment">-- The compressed output is not printable. EncodeForPrint will convert to
 </span><span class="comment">-- a printable format, in case you want to export to the user to
